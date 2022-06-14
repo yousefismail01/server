@@ -1,91 +1,109 @@
 const router = require("express").Router();
 const Snippet = require("../models/snippetModel");
+const auth = require("../middleware/auth");
 
-router.get("/", async (req, res) => {
-    try{
-        const snippets = await Snippet.find();
-        res.json(snippets);
-    }
-    catch(err) {
-        res.status(500).send();
-    }
+router.get("/", auth, async (req, res) => {
+  try {
+    const snippets = await Snippet.find({ user: req.user });
+    res.json(snippets);
+  } catch (err) {
+    res.status(500).send();
+  }
 });
 
-router.post("/",async (req, res) => {
-    try{
-        const {title, description, code} = req.body;
+router.post("/", auth, async (req, res) => {
+  try {
+    const { title, description, code } = req.body;
 
-        //validation
-        if(!description && !code) {
-            return res.status(400).json({ errorMessage: "You need to enter at least a description or some code."});
-        }
-
-        const newSnippet = new Snippet({
-         title, description, code
-        });
-
-        const savedSnippet = await newSnippet.save();
-
-         res.json(savedSnippet);
+    //validation
+    if (!description && !code) {
+      return res.status(400).json({
+        errorMessage: "You need to enter at least a description or some code.",
+      });
     }
-    catch(err) {
-        res.status(400).send();
-    }
+
+    const newSnippet = new Snippet({
+      title,
+      description,
+      code,
+      user: req.user,
+    });
+
+    const savedSnippet = await newSnippet.save();
+
+    res.json(savedSnippet);
+  } catch (err) {
+    res.status(400).send();
+  }
 });
 
-router.put("/:id", async (req, res) => {
-    try{
-        const {title, description, code} = req.body;
-        const snippetId = req.params.id;
-        
-        //validation
+router.put("/:id", auth, async (req, res) => {
+  try {
+    const { title, description, code } = req.body;
+    const snippetId = req.params.id;
 
-        if(!description && !code) {
-            return res.status(400).json({ errorMessage: "You need to enter at least a description or some code."});
-        }
+    //validation
 
-        if(!snippetId)
-            return res.status(400).json({ errorMessage: "Snippet ID not given. Please contact the developer"});
-
-        const originalSnippet = await Snippet.findById(snippetId);
-        if(!originalSnippet)
-            return res.status(400).json({ errorMessage: "No Snippet with this ID found. Please contact the developer."});
-
-        originalSnippet.title = title;
-        originalSnippet.description = description;
-        originalSnippet.code = code;
-
-        const savedSnippet = await originalSnippet.save();
-
-        res.json(savedSnippet);
-
-    } 
-    catch(err) {
-        res.status(500).send();
+    if (!description && !code) {
+      return res.status(400).json({
+        errorMessage: "You need to enter at least a description or some code.",
+      });
     }
+
+    if (!snippetId)
+      return res.status(400).json({
+        errorMessage: "Snippet ID not given. Please contact the developer",
+      });
+
+    const originalSnippet = await Snippet.findById(snippetId);
+    if (!originalSnippet)
+      return res.status(400).json({
+        errorMessage:
+          "No Snippet with this ID found. Please contact the developer.",
+      });
+
+    if (originalSnippet.user.toString() != req.user)
+      return res.status(401).json({ errorMessage: "Unauthorized." });
+
+    originalSnippet.title = title;
+    originalSnippet.description = description;
+    originalSnippet.code = code;
+
+    const savedSnippet = await originalSnippet.save();
+
+    res.json(savedSnippet);
+  } catch (err) {
+    res.status(500).send();
+  }
 });
 
+router.delete("/:id", auth, async (req, res) => {
+  try {
+    const snippetId = req.params.id;
 
-router.delete("/:id", async (req, res) => {
-    try{
-        const snippetId = req.params.id;
-        
-        //validation
+    //validation
 
-        if(!snippetId)
-            return res.status(400).json({ errorMessage: "Snippet ID not given. Please contact the developer"});
+    if (!snippetId)
+      return res.status(400).json({
+        errorMessage: "Snippet ID not given. Please contact the developer",
+      });
 
-        const existingSnippet = await Snippet.findById(snippetId);
-        if(!existingSnippet)
-            return res.status(400).json({ errorMessage: "No Snippet with this ID found. Please contact the developer."});
+    const existingSnippet = await Snippet.findById(snippetId);
+    if (!existingSnippet)
+      return res.status(400).json({
+        errorMessage:
+          "No Snippet with this ID found. Please contact the developer.",
+      });
 
-        await existingSnippet.delete();
+    if (existingSnippet.user.toString() != req.user)
+      return res.status(401).json({ errorMessage: "Unauthorized." });
 
-        res.json(existingSnippet);
-    } 
-    catch(err) {
-        res.status(500).send();
-    }
+    await existingSnippet.delete();
+
+    res.json(existingSnippet);
+  } catch (err) {
+    res.status(500).send();
+  }
 });
 
-module.exports =router;
+module.exports = router;
